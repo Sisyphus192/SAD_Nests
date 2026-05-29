@@ -97,16 +97,18 @@ function Resource_aggression_check(unfinished_table, bench)
 end
 
 local function can_spawn_nest(input)
-	local nest_species = find_nest_species(input).id
+	local nest_species = find_nest_species(input)
+	if not nest_species then return nil end
+	local species_id = nest_species.id
 	local nest_class_def = find_nest_class(input)
 	if not nest_class_def then return nil end
 	local nest_classname = nest_class_def.class
-	DebugPrint("Checking if can spawn nest for species: "..nest_species.id)
+	DebugPrint("Checking if can spawn nest for species: "..species_id)
 	DebugPrint("Checking how many nests of this clas exist on map: "..nest_classname)
 	local count_total = MapCount("map", nest_classname)
 
 	-- In cases where the player needs to do something before spawning is enabled.
-	if not Nest_Species_Savegame_Stats[nest_species]['spawnflag'] then return false end
+	if not Nest_Species_Savegame_Stats[species_id]['spawnflag'] then return false end
 
 	-- Do nothing if too many nests exist
 	if count_total >= Per_species_nest_max then
@@ -117,7 +119,7 @@ local function can_spawn_nest(input)
 	if GameTime() < Global_nest_spawn_cd then
 		-- cannot spawn due to global cd
 		return false
-	elseif Nest_Species_Savegame_Stats[nest_species] and Nest_Species_Savegame_Stats[nest_species][nest_species .. '_nest_spawn_cd'] and GameTime() < Nest_Species_Savegame_Stats[nest_species][nest_species .. '_nest_spawn_cd'] then
+	elseif Nest_Species_Savegame_Stats[species_id] and Nest_Species_Savegame_Stats[species_id][species_id .. '_nest_spawn_cd'] and GameTime() < Nest_Species_Savegame_Stats[species_id][species_id .. '_nest_spawn_cd'] then
 		-- cannot spawn due to species specific cd
 		return false
 	else
@@ -127,25 +129,26 @@ local function can_spawn_nest(input)
 end
 
 local function can_give_evo(input)
-	local nest_species = find_nest_species(input).id
+	local nest_species = find_nest_species(input)
 	if not nest_species then return nil end
+	local species_id = nest_species.id
 	if MapCount(true, nest_species.nest_class) <= 0 then
 		return false
 	end
 	local new_evo_time = GameTime() + DivRound(MoonInstance.AttackCooldownMin, 2)
-	local species_evo_var = nest_species.id .. '_evo_cd'
-	if not Nest_Species_Savegame_Stats[nest_species] or not Nest_Species_Savegame_Stats[nest_species][species_evo_var] then
-		Nest_Species_Savegame_Stats[nest_species] = Nest_Species_Savegame_Stats[nest_species] or {}
-		Nest_Species_Savegame_Stats[nest_species][species_evo_var] = new_evo_time
+	local species_evo_var = species_id .. '_evo_cd'
+	if not Nest_Species_Savegame_Stats[species_id] or not Nest_Species_Savegame_Stats[species_id][species_evo_var] then
+		Nest_Species_Savegame_Stats[species_id] = Nest_Species_Savegame_Stats[species_id] or {}
+		Nest_Species_Savegame_Stats[species_id][species_evo_var] = new_evo_time
 		DebugPrint("Nesting species did not have an entry in map vars for their evo events! Alert mod author!")
 		return true
-	elseif Nest_Species_Savegame_Stats[nest_species] and Nest_Species_Savegame_Stats[nest_species][species_evo_var] then
-		if GameTime() < Nest_Species_Savegame_Stats[nest_species][species_evo_var] then
+	elseif Nest_Species_Savegame_Stats[species_id] and Nest_Species_Savegame_Stats[species_id][species_evo_var] then
+		if GameTime() < Nest_Species_Savegame_Stats[species_id][species_evo_var] then
 			-- cannot evo due to species specific cd
 			return false
 		else
-			Nest_Species_Savegame_Stats[nest_species][species_evo_var] = new_evo_time
-			return false
+			Nest_Species_Savegame_Stats[species_id][species_evo_var] = new_evo_time
+			return true
 		end
 	else
 		return false
@@ -155,7 +158,11 @@ end
 function Aggression_up(input,location)
 	local nest_species = find_nest_species(input)
 	if not nest_species then
-		nest_species = Get_nest_species_by_region()
+		nest_species = find_nest_species(Get_nest_species_by_region())
+	end
+	if not nest_species then
+		DebugPrint("Aggression_up: could not resolve a nesting species; skipping\n")
+		return
 	end
 	DebugPrint("Aggression up called\n")
 	DebugPrint("Checking if species is valid")
@@ -204,14 +211,14 @@ function Aggression_up(input,location)
 			end
 		end)
 		local lowest_evo = 10
-		local tiers = get_tier_Table()
-		for _,v in ipairs(nests) do
-			local tier = tiers[v.elder_class]
-			if tier < lowest_evo then
+		for _,v in ipairs(nests or empty_table) do
+			local tier = EE_get_tier(v.elder_class)   -- lazy-inits EE's tier pivot; nil if species unmapped
+			if tier and tier < lowest_evo then
 				weakest_nest = v
 				lowest_evo = tier
 			end
 		end
+		if not weakest_nest then return end
 		DebugPrint("Weakest nest needed, here it is:")
 		DebugPrint(weakest_nest)
 	end
@@ -224,20 +231,27 @@ function Aggression_up(input,location)
 			weakest_nest:change_nest_herd(true)
 		end
 	elseif option == 'wakeup' then
-		local nest_picked = MapGetNearest("map", location, species_nest_name, function(this_nest)
-			if this_nest.state == 'asleep' then
-				return true
-			end
-		end)
-		nest_picked:scout_nearest_quad()
+		local nest_picked
+		if location then
+			nest_picked = MapFindNearest(location, "map", species_nest_name, function(this_nest)
+				return this_nest.state == 'asleep'
+			end)
+		else
+			nest_picked = MapGetFirst("map", species_nest_name, function(this_nest)
+				return this_nest.state == 'asleep'
+			end)
+		end
+		if nest_picked then
+			nest_picked:scout_nearest_quad()
+		end
 		--nest_picked:SwitchState("sleepy")
 	elseif option == 'bank' then
 		local species_banked_aggr = species_name..'_banked_aggr'
-		if Nest_Species_Savegame_Stats[species] and Nest_Species_Savegame_Stats[species_name][species_banked_aggr] then
+		if Nest_Species_Savegame_Stats[species_name] and Nest_Species_Savegame_Stats[species_name][species_banked_aggr] then
 			Nest_Species_Savegame_Stats[species_name][species_banked_aggr] = Nest_Species_Savegame_Stats[species_name][species_banked_aggr] + 5
 		else
 			DebugPrint("Nesting species does not have an entry in map vars for their banked aggro! Alert mod author!")
-			Nest_Species_Savegame_Stats[species_name] = {}
+			Nest_Species_Savegame_Stats[species_name] = Nest_Species_Savegame_Stats[species_name] or {}
 			Nest_Species_Savegame_Stats[species_name][species_banked_aggr] = 5
 		end
 	elseif option == 'consume' then
@@ -250,7 +264,11 @@ end
 function Aggression_down(input)
 	local nest_species = find_nest_species(input)
 	if not nest_species then
-		nest_species = Get_nest_species_by_region()
+		nest_species = find_nest_species(Get_nest_species_by_region())
+	end
+	if not nest_species then
+		DebugPrint("Aggression_down: could not resolve a nesting species; skipping\n")
+		return
 	end
 	local species_nest_name = nest_species.nest_class
 	DebugPrint("Aggression down called\n")

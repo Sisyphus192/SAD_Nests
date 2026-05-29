@@ -238,22 +238,23 @@ function Bkob_Log_NA(hard_string, var)
 	end
 end
 
--- input a string or classdef, output the nesting species classdef (If we can find it)
+-- input a preset id, nest class name, preset, or nest object; output the NestingSpeciesPreset (or false)
 function find_nest_species(input)
-	local str_check = type(input) == 'string'
-	local nest_spec_check, nest_entity_check
-	if str_check then
-		nest_spec_check = Presets.NestingSpeciesPreset.Default[input]
-		nest_entity_check = g_Classes[input]
-	else
-		nest_spec_check = IsKindOf(input, "NestingSpecies")
-		nest_entity_check = IsKindOf(input, "TerritorialNest")
+	-- Always resolve to the NestingSpeciesPreset object (or false), regardless of whether
+	-- the caller passed a preset id, a nest class name, the preset itself, or a nest object.
+	if type(input) == 'string' then
+		local by_id = Presets.NestingSpeciesPreset.Default[input]   -- preset id, e.g. "nesting_consortium"
+		if by_id then return by_id end
+		if g_Classes[input] then                                    -- nest class name, e.g. "ConsortiumNest"
+			local species_id = get_species_from_nest(input)
+			if species_id then return Presets.NestingSpeciesPreset.Default[species_id] end
+		end
+		return false
 	end
-	if nest_entity_check then
-		return get_species_from_nest(nest_entity_check.id)
-	end
-	if nest_spec_check then
-		return nest_spec_check
+	if IsKindOf(input, "NestingSpeciesPreset") then return input end
+	if IsKindOf(input, "TerritorialNest") then
+		local species_id = get_species_from_nest(input.class)
+		if species_id then return Presets.NestingSpeciesPreset.Default[species_id] end
 	end
 	return false
 end
