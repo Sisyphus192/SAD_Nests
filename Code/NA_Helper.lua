@@ -243,9 +243,9 @@ function find_nest_species(input)
 	-- Always resolve to the NestingSpeciesPreset object (or false), regardless of whether
 	-- the caller passed a preset id, a nest class name, the preset itself, or a nest object.
 	if type(input) == 'string' then
-		local by_id = Presets.NestingSpeciesPreset.Default[input]   -- preset id, e.g. "nesting_consortium"
+		local by_id = Presets.NestingSpeciesPreset.Default[input] -- preset id, e.g. "nesting_consortium"
 		if by_id then return by_id end
-		if g_Classes[input] then                                    -- nest class name, e.g. "ConsortiumNest"
+		if g_Classes[input] then                            -- nest class name, e.g. "ConsortiumNest"
 			local species_id = get_species_from_nest(input)
 			if species_id then return Presets.NestingSpeciesPreset.Default[species_id] end
 		end

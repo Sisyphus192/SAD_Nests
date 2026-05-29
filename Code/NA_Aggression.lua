@@ -1,7 +1,6 @@
-
 local og_produce_output = ProductionDeviceComponent.ProduceOutput
 function ProductionDeviceComponent:ProduceOutput(recipe, def, count, unit)
-	Resource_aggression_check(self.unfinished_item_data.used_resources,self)
+	Resource_aggression_check(self.unfinished_item_data.used_resources, self)
 	og_produce_output(self, recipe, def, count, unit)
 end
 
@@ -34,7 +33,7 @@ function Aggression_log_faction(input)
 	DebugPrint(IsKindOf(nesting_species, "NestingSpeciesPreset"))
 	DebugPrint(IsKindOf(nesting_species.id, "NestingSpeciesPreset"))
 	local to_return = false
-	local threshold = Faction_aggression_threshold or Max(0,6 - Get_difficulty_offset())
+	local threshold = Faction_aggression_threshold or Max(0, 6 - Get_difficulty_offset())
 	local count = 0
 	if Nest_Species_Savegame_Stats[nesting_species] and Nest_Species_Savegame_Stats[nesting_species][nesting_species .. '_aggro_events'] then
 		count = Nest_Species_Savegame_Stats[nesting_species][nesting_species .. '_aggro_events']
@@ -75,18 +74,18 @@ function Resource_aggression_check(unfinished_table, bench)
 	DebugPrint("recipe_res")
 	DebugPrint(recipe_res)
 	--local scale = const.ResourceScale -- 1000 base
-	for _,res in ipairs(recipe_res) do
-		DebugPrint("Checking res: "..res)
+	for _, res in ipairs(recipe_res) do
+		DebugPrint("Checking res: " .. res)
 		if res_table[res] then
 			DebugPrint("it is a res that nests care about")
 			-- already scaled because this is from the recipe
 			local consumed = unfinished_table[res]
-			for _,v in ipairs(res_table[res]) do
+			for _, v in ipairs(res_table[res]) do
 				local roll = AsyncRand(100)
 				local aggression_roll = roll > DivRound(consumed * 100, v.chance)
 				if consumed >= v.chance or aggression_roll then
-					DebugPrint("Aggression triggered for species: "..v.species)
-					Aggression_up(v.species,bench)
+					DebugPrint("Aggression triggered for species: " .. v.species)
+					Aggression_up(v.species, bench)
 					aggroed[#aggroed + 1] = v.species
 				end
 			end
@@ -103,8 +102,8 @@ local function can_spawn_nest(input)
 	local nest_class_def = find_nest_class(input)
 	if not nest_class_def then return nil end
 	local nest_classname = nest_class_def.class
-	DebugPrint("Checking if can spawn nest for species: "..species_id)
-	DebugPrint("Checking how many nests of this clas exist on map: "..nest_classname)
+	DebugPrint("Checking if can spawn nest for species: " .. species_id)
+	DebugPrint("Checking how many nests of this clas exist on map: " .. nest_classname)
 	local count_total = MapCount("map", nest_classname)
 
 	-- In cases where the player needs to do something before spawning is enabled.
@@ -155,7 +154,7 @@ local function can_give_evo(input)
 	end
 end
 
-function Aggression_up(input,location)
+function Aggression_up(input, location)
 	local nest_species = find_nest_species(input)
 	if not nest_species then
 		nest_species = find_nest_species(Get_nest_species_by_region())
@@ -193,7 +192,7 @@ function Aggression_up(input,location)
 		if can_give_evo(species_name) then
 			choice[#choice + 1] = { event = 'evo', weight = 200 }
 		end
-		if  DivRound(count_awake * 100, count_total) < 75 then
+		if DivRound(count_awake * 100, count_total) < 75 then
 			choice[#choice + 1] = { event = 'wakeup', weight = 150 }
 		end
 	end
@@ -211,8 +210,8 @@ function Aggression_up(input,location)
 			end
 		end)
 		local lowest_evo = 10
-		for _,v in ipairs(nests or empty_table) do
-			local tier = EE_get_tier(v.elder_class)   -- lazy-inits EE's tier pivot; nil if species unmapped
+		for _, v in ipairs(nests or empty_table) do
+			local tier = EE_get_tier(v.elder_class) -- lazy-inits EE's tier pivot; nil if species unmapped
 			if tier and tier < lowest_evo then
 				weakest_nest = v
 				lowest_evo = tier
@@ -246,16 +245,17 @@ function Aggression_up(input,location)
 		end
 		--nest_picked:SwitchState("sleepy")
 	elseif option == 'bank' then
-		local species_banked_aggr = species_name..'_banked_aggr'
+		local species_banked_aggr = species_name .. '_banked_aggr'
 		if Nest_Species_Savegame_Stats[species_name] and Nest_Species_Savegame_Stats[species_name][species_banked_aggr] then
-			Nest_Species_Savegame_Stats[species_name][species_banked_aggr] = Nest_Species_Savegame_Stats[species_name][species_banked_aggr] + 5
+			Nest_Species_Savegame_Stats[species_name][species_banked_aggr] = Nest_Species_Savegame_Stats[species_name]
+			[species_banked_aggr] + 5
 		else
 			DebugPrint("Nesting species does not have an entry in map vars for their banked aggro! Alert mod author!")
 			Nest_Species_Savegame_Stats[species_name] = Nest_Species_Savegame_Stats[species_name] or {}
 			Nest_Species_Savegame_Stats[species_name][species_banked_aggr] = 5
 		end
 	elseif option == 'consume' then
-		for i=1, Max(1, Get_difficulty_offset()) do
+		for i = 1, Max(1, Get_difficulty_offset()) do
 			weakest_nest:consume_closest_node()
 		end
 	end
